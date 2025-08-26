@@ -1,0 +1,38 @@
+b
+gender = (df.groupBy("Gender")
+            .agg(F.count("*").alias("Total"),
+                 F.sum("Exited").alias("Churned"))
+            .withColumn("ChurnRate", F.col("Churned")/F.col("Total")))
+display(gender)
+
+c
+df_age = (df.withColumn(
+    "AgeGroup",
+    F.when(F.col("Age") < 30, "18-29")
+     .when(F.col("Age") < 40, "30-39")
+     .when(F.col("Age") < 50, "40-49")
+     .when(F.col("Age") < 60, "50-59")
+     .otherwise("60+"))
+)
+
+age_grp = (df_age.groupBy("AgeGroup")
+                .agg(F.count("*").alias("Total"),
+                     F.sum("Exited").alias("Churned"))
+                .withColumn("ChurnRate", F.col("Churned")/F.col("Total")))
+display(age_grp.orderBy("AgeGroup"))
+
+d
+# Simple pairwise Pearson correlations
+for a,b in [("CreditScore","Balance"), ("CreditScore","Exited"), ("Balance","Exited")]:
+    print(f"corr({a},{b}) =", df.stat.corr(a,b))
+
+# Optional: full correlation matrix over numeric fields
+from pyspark.ml.feature import VectorAssembler
+from pyspark.ml.stat import Correlation
+
+num_cols = ["CreditScore","Age","Tenure","Balance","NumOfProducts","HasCrCard","IsActiveMember","EstimatedSalary","Exited"]
+df_vec = df.select([F.col(c).cast("double") for c in num_cols]).na.drop()
+va = VectorAssembler(inputCols=num_cols, outputCol="features")
+vf = va.transform(df_vec)
+pearson = Correlation.corr(vf, "features", "pearson").head()[0].toArray().tolist()
+pearson  # view matrix; you can also convert to a Spark DataFrame for pretty display
